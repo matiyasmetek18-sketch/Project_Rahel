@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Review Application{% endblock %}
+{% block body %}
+<h1>{{ draft["title"] }} at {{ draft["company"] }}</h1>
+<p><span class="status">{{ draft["status"] }}</span> · <strong>Application type:</strong> {{ draft["label"] }} · Score {{ draft["score"] }}/100</p>
+<h2>Reasons</h2>
+<ul>{% for item in draft["reasons"]|json_items %}<li>{{ item }}</li>{% endfor %}</ul>
+<h2>Questions before approval</h2>
+<ul>{% for item in draft["unanswered_questions"]|json_items %}<li>{{ item }}</li>{% else %}<li>No unanswered required questions.</li>{% endfor %}</ul>
+<form method="post" class="panel">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>Resume summary <textarea name="resume_summary">{{ draft["resume_summary"] }}</textarea></label>
+  <label>Cover letter <textarea name="cover_letter" rows="10">{{ draft["cover_letter"] }}</textarea></label>
+  <label>Form answers <textarea name="form_answers">{{ draft["form_answers"] }}</textarea></label>
+  <div class="actions">
+    <button name="action" value="save" type="submit">Save edits</button>
+  </div>
+</form>
+<form method="post" class="panel">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <p>Approval records permission for this application only. It does not submit the application.</p>
+  <label>Type 1 to approve this one application <input name="confirm_count" inputmode="numeric"></label>
+  <label>Note <textarea name="note"></textarea></label>
+  <div class="actions">
+    <button name="action" value="approve" type="submit">Approve</button>
+    <button name="action" value="open" type="submit" class="secondary">Open to submit manually</button>
+    <button name="action" value="reject" type="submit" class="danger">Reject</button>
+  </div>
+</form>
+{% if draft["status"] == "opened_for_manual_submission" %}
+<form method="post" class="panel">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <p>Only mark submitted after you personally submit the employer form.</p>
+  <label>Outcome note <textarea name="note"></textarea></label>
+  <div class="actions">
+    <button name="action" value="submitted" type="submit">I submitted it</button>
+    <button name="action" value="not_submitted" type="submit" class="secondary">I did not submit it</button>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

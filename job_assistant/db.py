@@ -35,6 +35,26 @@ CREATE TABLE IF NOT EXISTS profiles (
     confirmed_resume_summary TEXT NOT NULL DEFAULT ''
 );
 
+CREATE TABLE IF NOT EXISTS job_search_settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    job_titles TEXT NOT NULL DEFAULT '',
+    acceptable_locations TEXT NOT NULL DEFAULT '',
+    minimum_pay REAL,
+    employment_types TEXT NOT NULL DEFAULT '',
+    search_keywords TEXT NOT NULL DEFAULT '',
+    remote_ok INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS account_settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    default_daily_limit INTEGER NOT NULL DEFAULT 5,
+    pause_all INTEGER NOT NULL DEFAULT 0,
+    high_contrast INTEGER NOT NULL DEFAULT 1,
+    large_text INTEGER NOT NULL DEFAULT 1
+);
+
 CREATE TABLE IF NOT EXISTS credentials (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -78,7 +98,12 @@ CREATE TABLE IF NOT EXISTS job_postings (
     description TEXT NOT NULL DEFAULT '',
     required_fields TEXT NOT NULL DEFAULT '',
     required_credentials TEXT NOT NULL DEFAULT '',
+    hourly_pay REAL,
+    employment_type TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'discovered',
+    exclusion_reason TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT '',
     UNIQUE(user_id, source_site, external_id)
 );
 
@@ -92,7 +117,10 @@ CREATE TABLE IF NOT EXISTS application_drafts (
     unanswered_questions TEXT NOT NULL,
     resume_summary TEXT NOT NULL,
     cover_letter TEXT NOT NULL,
+    form_answers TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending_review',
     created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT '',
     UNIQUE(user_id, job_id)
 );
 
@@ -126,6 +154,21 @@ CREATE TABLE IF NOT EXISTS site_limits (
 );
 """
 
+MIGRATIONS = {
+    "job_postings": {
+        "hourly_pay": "ALTER TABLE job_postings ADD COLUMN hourly_pay REAL",
+        "employment_type": "ALTER TABLE job_postings ADD COLUMN employment_type TEXT NOT NULL DEFAULT ''",
+        "status": "ALTER TABLE job_postings ADD COLUMN status TEXT NOT NULL DEFAULT 'discovered'",
+        "exclusion_reason": "ALTER TABLE job_postings ADD COLUMN exclusion_reason TEXT NOT NULL DEFAULT ''",
+        "updated_at": "ALTER TABLE job_postings ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''",
+    },
+    "application_drafts": {
+        "form_answers": "ALTER TABLE application_drafts ADD COLUMN form_answers TEXT NOT NULL DEFAULT ''",
+        "status": "ALTER TABLE application_drafts ADD COLUMN status TEXT NOT NULL DEFAULT 'pending_review'",
+        "updated_at": "ALTER TABLE application_drafts ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''",
+    },
+}
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -147,6 +190,15 @@ def init_db(path: Path | str) -> None:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with connect(db_path) as conn:
         conn.executescript(SCHEMA)
+        run_migrations(conn)
+
+
+def run_migrations(conn: sqlite3.Connection) -> None:
+    for table, columns in MIGRATIONS.items():
+        existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        for column, statement in columns.items():
+            if column not in existing:
+                conn.execute(statement)
 
 
 @contextmanager
@@ -157,4 +209,3 @@ def get_connection(path: Path | str) -> Iterator[sqlite3.Connection]:
         conn.commit()
     finally:
         conn.close()
-

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Review Queue{% endblock %}
+{% block body %}
+<h1>Review queue</h1>
+{% for draft in drafts %}
+<article class="card">
+  <h2>{{ draft["title"] }} at {{ draft["company"] }}</h2>
+  <p><span class="status">{{ draft["status"] }}</span> · {{ draft["label"] }} · Score {{ draft["score"] }}/100</p>
+  <a class="button" href="{{ url_for('review_detail', draft_id=draft['id']) }}">Review draft</a>
+</article>
+{% else %}
+<p>No applications are waiting for review.</p>
+{% endfor %}
+{% endblock %}
+

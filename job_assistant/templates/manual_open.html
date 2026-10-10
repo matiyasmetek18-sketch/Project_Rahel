@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Open Application{% endblock %}
+{% block body %}
+<h1>Open application</h1>
+<p class="flash success">The app recorded that you opened this manual application. It has not been submitted.</p>
+<p><a class="button" href="{{ url }}" target="_blank" rel="noopener noreferrer">Open employer page</a></p>
+<p class="muted">If the site asks for login, CAPTCHA, two-factor, or sensitive voluntary questions, handle it yourself. The app will not bypass or answer those.</p>
+<a href="{{ url_for('review_detail', draft_id=draft['id']) }}">Return and confirm the outcome</a>
+{% endblock %}
+

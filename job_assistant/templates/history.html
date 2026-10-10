@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Application History{% endblock %}
+{% block body %}
+<h1>Application history</h1>
+<table>
+  <thead><tr><th>Status</th><th>Role</th><th>Company</th><th>Source</th><th>Updated</th></tr></thead>
+  <tbody>
+  {% for row in rows %}
+    <tr><td><span class="status">{{ row["status"] }}</span></td><td>{{ row["title"] }}</td><td>{{ row["company"] }}</td><td>{{ row["source_site"] }}</td><td>{{ row["updated_at"] }}</td></tr>
+  {% else %}
+    <tr><td colspan="5">No application history yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
+

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Resume{% endblock %}
+{% block body %}
+<h1>Resume</h1>
+<form method="post" enctype="multipart/form-data" class="panel">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>Resume PDF or DOCX <input name="resume" type="file" accept=".pdf,.docx" required></label>
+  <button type="submit">Upload resume</button>
+</form>
+{% if resume %}
+<p class="card">Latest upload: {{ resume["original_filename"] }} on {{ resume["uploaded_at"] }}.</p>
+{% endif %}
+<p class="muted">The app does not automatically trust extracted text. Confirm the summary on the Profile page before drafts use it.</p>
+{% endblock %}
+

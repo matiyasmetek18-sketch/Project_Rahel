@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block body %}
+<h1>Dashboard</h1>
+<p class="muted">Signed in as {{ g.user["username"] }}. This account only shows this user's jobs and applications.</p>
+<section class="grid" aria-label="Application overview">
+  <div class="card"><h2>{{ counts.jobs }}</h2><p>Discovered jobs</p></div>
+  <div class="card"><h2>{{ counts.pending }}</h2><p>Waiting for review</p></div>
+  <div class="card"><h2>{{ counts.approved }}</h2><p>Approved, not submitted</p></div>
+  <div class="card"><h2>{{ counts.history }}</h2><p>Total drafts</p></div>
+</section>
+<div class="actions">
+  <a class="button" href="{{ url_for('import_jobs') }}">Import jobs</a>
+  <a class="button secondary" href="{{ url_for('review_queue') }}">Review applications</a>
+</div>
+{% endblock %}
+

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Import Jobs{% endblock %}
+{% block body %}
+<h1>Import jobs</h1>
+<p class="muted">Paste fictional or permitted job data as JSON. This avoids scraping and keeps tests offline.</p>
+<form method="post" class="panel">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>Jobs JSON
+    <textarea name="jobs_json" rows="14" required>[{"source_site":"manual_import","external_id":"care-1","title":"Caregiver","company":"Example Care","city":"Lynnwood","state":"WA","url":"https://example.test/apply","description":"Caregiving transfer support companionship","required_fields":["name","email","phone","resume"]}]</textarea>
+  </label>
+  <button type="submit">Import jobs</button>
+</form>
+{% endblock %}
+
