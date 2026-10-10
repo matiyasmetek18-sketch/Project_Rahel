@@ -26,7 +26,26 @@ This project is a local-first job-application assistant for two separate account
 
 ## Milestone Status
 
-- Milestone 1: foundations in progress/completed in this repository.
-- Milestone 2: full website pages and manual submission flow.
+- Milestone 1: completed in commit `b86254d`.
+- Milestone 2: completed in commit `1b91683`.
 - Milestone 3: one verified permitted easy-apply adapter, selected by the user after terms review.
 
+## Verified Milestone 2 Behavior
+
+- The website uses Flask and server-rendered Jinja templates with minimal JavaScript.
+- Required pages exist: sign in, dashboard, profile, credentials, resume, job-search settings, job feed, review queue, application history, and settings.
+- Job discovery is implemented as a permitted manual JSON import workflow. This intentionally avoids scraping and keeps tests offline.
+- Imported jobs are normalized and deduplicated per account by source and external id.
+- Application drafts move through the server-side state machine: `discovered`, `prepared`, `pending_review`, `approved`, `opened_for_manual_submission`, `submitted`, `not_submitted`, `rejected`, and `failed`.
+- Milestone 2 never auto-submits. Opening an employer page records only `opened_for_manual_submission`.
+- Only the user can confirm a manual submission.
+- Pause-all and daily limits are enforced before opening a manual application page.
+- Logout and all mutating forms require CSRF tokens.
+- Tests are offline and use fictional data only.
+
+## Current Limitations
+
+- Resume text extraction is not implemented. The user must confirm a resume summary manually before drafts can use it.
+- Job import expects trusted/permitted JSON entered by the user. There is no public API integration yet.
+- Per-site adapters and automated easy-apply submission are intentionally not implemented until Milestone 3.
+- The UI is accessible and responsive, but it has not been tested with a screen reader by a human.
