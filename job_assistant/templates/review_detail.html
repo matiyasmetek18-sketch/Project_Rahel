@@ -38,4 +38,12 @@
   </div>
 </form>
 {% endif %}
+<section class="panel">
+  <h2>Audit log</h2>
+  {% for event in events %}
+    <p><strong>{{ event["event_type"] }}</strong> · {{ event["created_at"] }}<br>{{ event["message"] }}</p>
+  {% else %}
+    <p>No audit events recorded yet.</p>
+  {% endfor %}
+</section>
 {% endblock %}

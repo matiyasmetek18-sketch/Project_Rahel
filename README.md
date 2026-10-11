@@ -32,6 +32,7 @@ Run tests:
 
 - Secure sign-in with bcrypt password hashing, secure session cookies, and CSRF protection.
 - Rahel profile, credentials, work history, résumé upload, job preferences, job feed, review queue, application history, and settings.
+- Guided onboarding page for profile readiness, résumé confirmation, and public employer board setup.
 - Private résumé storage under `private/`.
 - PDF/DOCX text extraction with user confirmation before saving extracted skills or summary data.
 - Manual JSON import remains available for permitted postings.
@@ -40,15 +41,16 @@ Run tests:
 - Feed-level discovery metrics for valid listings, relevant listings, likely eligibility, unknown qualifications, and stale postings.
 - Stale posting detection when a previously fetched job no longer appears in a configured employer feed.
 - Manual application review, approval, open-to-submit, and user-confirmed outcome tracking.
+- Visible audit events on review and history pages.
 - Pause-all and daily-limit safeguards.
 - Offline tests with fictional data and mocked external sources.
 
 ## Finding Jobs
 
 1. Sign in as Rahel.
-2. Open **Search Settings**.
-3. Enter caregiver preferences such as job titles, locations, minimum pay, and employment types.
-4. Add employer job boards:
+2. Open **Onboarding**.
+3. Complete profile, preferences, résumé confirmation, and credentials.
+4. Add the recommended public boards or open **Search Settings** and add employer boards:
    - Greenhouse: use the public board token from the employer's Greenhouse board.
    - Lever: use the public Lever site name.
 5. Click **Find Jobs**.
@@ -80,6 +82,8 @@ The current workflow is:
 
 Approval is not submission. Opening the employer page is not submission. Only Rahel's confirmation records a submitted application.
 
+Drafts are deterministic and editable. They use only confirmed profile data, confirmed résumé summary, and saved work history. Unknown required fields remain questions before approval.
+
 ## Agent Architecture
 
 The code includes Milestone 3A scaffolding for:
@@ -105,6 +109,10 @@ Security-critical decisions, authorization, state transitions, and eligibility c
 - Never submit applications through sites whose terms prohibit automation.
 - Store API keys only in environment variables.
 - Keep `.env`, local databases, résumés, cookies, and browser session files out of git.
+
+## Automation Boundary
+
+See [docs/automation.md](docs/automation.md). Real browser-assisted form filling and API submission are disabled. Greenhouse and Lever are used only for permitted public read-only discovery. The MVP opens employer application pages for Rahel and records the outcome she confirms.
 
 ## Current Limitations
 

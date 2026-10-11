@@ -15,6 +15,12 @@ from .resume_intelligence import extract_resume
 from .resumes import ALLOWED_EXTENSIONS, stored_resume_path, validate_resume_file
 from .security import issue_csrf_token, login_required, validate_csrf
 
+RECOMMENDED_JOB_SOURCES = (
+    ("lever", "mylaurelhealth", "myLaurel"),
+    ("greenhouse", "bayada", "BAYADA Home Health Care"),
+    ("lever", "distro", "Distro"),
+)
+
 
 def create_app(config_object: type[Config] = Config) -> Flask:
     app = Flask(__name__)
@@ -75,7 +81,30 @@ def create_app(config_object: type[Config] = Config) -> Flask:
     @app.get("/dashboard")
     @login_required
     def dashboard():
-        return render_template("dashboard.html", counts=g.repo.dashboard_counts(g.user["id"]))
+        return render_template(
+            "dashboard.html",
+            counts=g.repo.dashboard_counts(g.user["id"]),
+            onboarding=g.repo.onboarding_status(g.user["id"]),
+        )
+
+    @app.get("/onboarding")
+    @login_required
+    def onboarding():
+        return render_template(
+            "onboarding.html",
+            status=g.repo.onboarding_status(g.user["id"]),
+            profile=g.repo.profile_for_user(g.user["id"]),
+            sources=g.repo.list_job_sources(g.user["id"]),
+        )
+
+    @app.post("/onboarding/recommended-sources")
+    @login_required
+    def add_recommended_sources():
+        validate_csrf()
+        for provider, board_identifier, display_name in RECOMMENDED_JOB_SOURCES:
+            g.repo.add_job_source(g.user["id"], provider, board_identifier, display_name)
+        flash("Recommended public caregiver job boards added.", "success")
+        return redirect(url_for("onboarding"))
 
     @app.route("/profile", methods=["GET", "POST"])
     @login_required
@@ -333,12 +362,12 @@ def create_app(config_object: type[Config] = Config) -> Flask:
         if not draft:
             flash("Draft not found.", "error")
             return redirect(url_for("review_queue"))
-        return render_template("review_detail.html", draft=draft)
+        return render_template("review_detail.html", draft=draft, events=g.repo.draft_events(g.user["id"], draft_id))
 
     @app.get("/history")
     @login_required
     def application_history():
-        return render_template("history.html", rows=g.repo.application_history(g.user["id"]))
+        return render_template("history.html", rows=g.repo.application_history(g.user["id"]), events=g.repo.recent_application_events(g.user["id"]))
 
     @app.route("/settings", methods=["GET", "POST"])
     @login_required

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from job_assistant.drafting import make_cover_letter
+from job_assistant.drafting import make_cover_letter, make_form_answers
 from job_assistant.models import Credential, JobPosting, Profile
 from job_assistant.rules import can_submit_application, classify_easy_apply, score_job
 
@@ -31,6 +31,23 @@ def test_no_fabrication_in_cover_letter():
     letter, questions = make_cover_letter(profile, job)
     assert letter == ""
     assert "confirmed resume summary" in questions[0]
+
+
+def test_confirmed_profile_data_populates_editable_form_answers():
+    profile = Profile(
+        "Rahel Example",
+        "rahel@example.com",
+        phone="555-0100",
+        city="Lynnwood",
+        state="WA",
+        skills=("caregiving", "transfers"),
+        availability="weekdays",
+    )
+    rows = [{"employer": "Fictional Care", "title": "Caregiver", "start_date": "2024-01-01", "end_date": "", "tasks": "Companionship"}]
+    answers = make_form_answers(profile, rows)
+    assert "Rahel Example" in answers
+    assert "caregiving" in answers
+    assert "Fictional Care" in answers
 
 
 def test_expired_credentials_do_not_satisfy_requirement():
