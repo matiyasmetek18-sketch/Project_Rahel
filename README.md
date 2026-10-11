@@ -36,7 +36,8 @@ Run tests:
 - PDF/DOCX text extraction with user confirmation before saving extracted skills or summary data.
 - Manual JSON import remains available for permitted postings.
 - Live read-only job discovery from configured employer boards: Greenhouse Job Board API and Lever Postings API.
-- Deterministic caregiver job scoring with explainable reasons.
+- Deterministic caregiver job scoring with explainable reasons, shown directly in the job feed before drafts are prepared.
+- Stale posting detection when a previously fetched job no longer appears in a configured employer feed.
 - Manual application review, approval, open-to-submit, and user-confirmed outcome tracking.
 - Pause-all and daily-limit safeguards.
 - Offline tests with fictional data and mocked external sources.
@@ -50,7 +51,7 @@ Run tests:
    - Greenhouse: use the public board token from the employer's Greenhouse board.
    - Lever: use the public Lever site name.
 5. Click **Find Jobs**.
-6. Open **Job Feed** to inspect ranked postings and match explanations.
+6. Open **Job Feed** to inspect ranked postings, match explanations, missing information, and stale-listing warnings.
 
 The adapters only read public job postings. They do not submit applications.
 
