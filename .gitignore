@@ -6,6 +6,9 @@ __pycache__/
 instance/
 data/
 private/
+cookies/
+browser_sessions/
+playwright/.auth/
 *.sqlite
 *.db
 

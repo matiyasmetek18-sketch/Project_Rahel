@@ -11,6 +11,7 @@ from .db import init_db
 from .importer import parse_job_json
 from .models import Credential
 from .repository import Repository
+from .resume_intelligence import extract_resume
 from .resumes import ALLOWED_EXTENSIONS, stored_resume_path, validate_resume_file
 from .security import issue_csrf_token, login_required, validate_csrf
 
@@ -154,16 +155,48 @@ def create_app(config_object: type[Config] = Config) -> Flask:
                     destination.parent.mkdir(parents=True, exist_ok=True)
                     uploaded.save(destination)
                     content_type = ALLOWED_EXTENSIONS[destination.suffix.lower()]
-                    g.repo.record_resume(g.user["id"], uploaded.filename, str(destination), content_type)
+                    extraction = extract_resume(destination)
+                    g.repo.record_resume(
+                        g.user["id"],
+                        uploaded.filename,
+                        str(destination),
+                        content_type,
+                        extraction.text,
+                        json.dumps(extraction.to_dict()),
+                    )
                     flash("Resume uploaded. Confirm the summary before using it in drafts.", "success")
                 else:
                     flash(message, "error")
             return redirect(url_for("resume_upload"))
+        resume = g.repo.latest_resume(g.user["id"])
+        extracted = {}
+        if resume and resume["extracted_json"]:
+            try:
+                extracted = json.loads(resume["extracted_json"])
+            except json.JSONDecodeError:
+                extracted = {}
         return render_template(
             "resume.html",
-            resume=g.repo.latest_resume(g.user["id"]),
+            resume=resume,
+            extracted=extracted,
             profile=g.repo.profile_for_user(g.user["id"]),
         )
+
+    @app.post("/resume/confirm")
+    @login_required
+    def confirm_resume():
+        validate_csrf()
+        try:
+            g.repo.confirm_resume_extraction(
+                g.user["id"],
+                int(request.form["resume_id"]),
+                request.form.get("confirmed_resume_summary", ""),
+                request.form.get("skills", ""),
+            )
+            flash("Confirmed resume details saved to Rahel's profile.", "success")
+        except (PermissionError, ValueError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("resume_upload"))
 
     @app.route("/job-search-settings", methods=["GET", "POST"])
     @login_required
@@ -181,7 +214,36 @@ def create_app(config_object: type[Config] = Config) -> Flask:
             )
             flash("Job-search settings saved.", "success")
             return redirect(url_for("job_search_settings"))
-        return render_template("job_search_settings.html", settings=g.repo.search_settings(g.user["id"]))
+        return render_template(
+            "job_search_settings.html",
+            settings=g.repo.search_settings(g.user["id"]),
+            sources=g.repo.list_job_sources(g.user["id"]),
+        )
+
+    @app.post("/job-sources")
+    @login_required
+    def add_job_source():
+        validate_csrf()
+        provider = request.form.get("provider", "")
+        board_identifier = request.form.get("board_identifier", "").strip()
+        if provider not in {"greenhouse", "lever", "lever_eu"}:
+            flash("Choose Greenhouse or Lever.", "error")
+        elif not board_identifier:
+            flash("Enter the employer board identifier.", "error")
+        else:
+            g.repo.add_job_source(g.user["id"], provider, board_identifier, request.form.get("display_name", ""))
+            flash("Job board saved.", "success")
+        return redirect(url_for("job_search_settings"))
+
+    @app.post("/jobs/find")
+    @login_required
+    def find_jobs():
+        validate_csrf()
+        result = g.repo.fetch_jobs_from_sources(g.user["id"])
+        for error in result["errors"]:
+            flash(error, "error")
+        flash(f"Found {result['found']} postings. Added {result['created']} and updated {result['updated']}.", "success")
+        return redirect(url_for("job_feed"))
 
     @app.route("/jobs/import", methods=["GET", "POST"])
     @login_required

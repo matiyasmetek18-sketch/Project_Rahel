@@ -46,6 +46,19 @@ CREATE TABLE IF NOT EXISTS job_search_settings (
     remote_ok INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS job_sources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL,
+    board_identifier TEXT NOT NULL,
+    display_name TEXT NOT NULL DEFAULT '',
+    active INTEGER NOT NULL DEFAULT 1,
+    last_status TEXT NOT NULL DEFAULT '',
+    last_fetched_at TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(user_id, provider, board_identifier)
+);
+
 CREATE TABLE IF NOT EXISTS account_settings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
@@ -82,6 +95,8 @@ CREATE TABLE IF NOT EXISTS resumes (
     stored_path TEXT NOT NULL,
     content_type TEXT NOT NULL,
     uploaded_at TEXT NOT NULL,
+    extracted_text TEXT NOT NULL DEFAULT '',
+    extracted_json TEXT NOT NULL DEFAULT '',
     confirmed INTEGER NOT NULL DEFAULT 0
 );
 
@@ -100,6 +115,8 @@ CREATE TABLE IF NOT EXISTS job_postings (
     required_credentials TEXT NOT NULL DEFAULT '',
     hourly_pay REAL,
     employment_type TEXT NOT NULL DEFAULT '',
+    remote INTEGER NOT NULL DEFAULT 0,
+    source_metadata TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'discovered',
     exclusion_reason TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
@@ -158,9 +175,15 @@ MIGRATIONS = {
     "job_postings": {
         "hourly_pay": "ALTER TABLE job_postings ADD COLUMN hourly_pay REAL",
         "employment_type": "ALTER TABLE job_postings ADD COLUMN employment_type TEXT NOT NULL DEFAULT ''",
+        "remote": "ALTER TABLE job_postings ADD COLUMN remote INTEGER NOT NULL DEFAULT 0",
+        "source_metadata": "ALTER TABLE job_postings ADD COLUMN source_metadata TEXT NOT NULL DEFAULT ''",
         "status": "ALTER TABLE job_postings ADD COLUMN status TEXT NOT NULL DEFAULT 'discovered'",
         "exclusion_reason": "ALTER TABLE job_postings ADD COLUMN exclusion_reason TEXT NOT NULL DEFAULT ''",
         "updated_at": "ALTER TABLE job_postings ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''",
+    },
+    "resumes": {
+        "extracted_text": "ALTER TABLE resumes ADD COLUMN extracted_text TEXT NOT NULL DEFAULT ''",
+        "extracted_json": "ALTER TABLE resumes ADD COLUMN extracted_json TEXT NOT NULL DEFAULT ''",
     },
     "application_drafts": {
         "form_answers": "ALTER TABLE application_drafts ADD COLUMN form_answers TEXT NOT NULL DEFAULT ''",
