@@ -32,7 +32,7 @@ def logout(client) -> None:
 
 def test_full_manual_application_acceptance_flow_and_account_isolation(client, repo: Repository):
     repo.create_user("rahel", "rahel@example.com", "another-safe-password")
-    repo.create_user("matiyas", "matiyas@example.com", "a-very-safe-password")
+    repo.create_user("reviewer", "reviewer@example.com", "a-very-safe-password")
 
     login(client, "rahel", "another-safe-password")
 
@@ -147,7 +147,7 @@ def test_full_manual_application_acceptance_flow_and_account_isolation(client, r
     assert "Example Care" in response.get_data(as_text=True)
 
     logout(client)
-    login(client, "matiyas", "a-very-safe-password")
+    login(client, "reviewer", "a-very-safe-password")
     assert "Example Care" not in client.get("/jobs").get_data(as_text=True)
     assert "Example Care" not in client.get("/history").get_data(as_text=True)
     response = client.get("/review/1", follow_redirects=True)

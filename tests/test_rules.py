@@ -26,8 +26,8 @@ def test_easy_apply_only_allows_known_profile_fields():
 
 
 def test_no_fabrication_in_cover_letter():
-    profile = Profile(full_name="Matiyas Example", email="m@example.com")
-    job = JobPosting("demo", "1", "Intern", "Tech Co", "Seattle", "WA", "https://example.test")
+    profile = Profile(full_name="Rahel Example", email="rahel@example.com")
+    job = JobPosting("demo", "1", "Caregiver", "Care Co", "Lynnwood", "WA", "https://example.test")
     letter, questions = make_cover_letter(profile, job)
     assert letter == ""
     assert "confirmed resume summary" in questions[0]
@@ -46,4 +46,31 @@ def test_approval_gate_and_daily_limit():
     assert can_submit_application(False, 0, 5)[0] is False
     assert can_submit_application(True, 5, 5)[0] is False
     assert can_submit_application(True, 4, 5)[0] is True
+
+
+def test_caregiver_scoring_explains_missing_information_and_matches():
+    profile = Profile(
+        "Rahel Example",
+        "rahel@example.com",
+        skills=("caregiving", "transfers"),
+        acceptable_cities=("Lynnwood",),
+        minimum_hourly_pay=22,
+        job_types=("caregiver",),
+        availability="weekdays",
+    )
+    job = JobPosting(
+        "manual_import",
+        "care-1",
+        "In-Home Caregiver",
+        "Example Care",
+        "Lynnwood",
+        "WA",
+        "https://example.test/apply",
+        "Caregiving transfers weekdays",
+        hourly_pay=25,
+    )
+    result = score_job(profile, [], job)
+    assert result.value > 70
+    assert any("City matches" in reason for reason in result.reasons)
+    assert any("Skills match" in reason for reason in result.reasons)
 

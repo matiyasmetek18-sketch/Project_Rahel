@@ -63,4 +63,7 @@ class JobPosting:
     required_fields: tuple[str, ...] = ()
     required_credentials: tuple[str, ...] = ()
     hourly_pay: float | None = None
+    employment_type: str = ""
+    remote: bool = False
+    source_metadata: str = ""
 

@@ -9,6 +9,19 @@
 </form>
 {% if resume %}
 <p class="card">Latest upload: {{ resume["original_filename"] }} on {{ resume["uploaded_at"] }}.</p>
+  {% if resume["extracted_json"] %}
+    <form method="post" action="{{ url_for('confirm_resume') }}" class="panel">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="resume_id" value="{{ resume['id'] }}">
+      <p>Review these extracted details before saving them. They are not trusted until you confirm them.</p>
+      {% if extracted.get("warnings") %}
+        <ul>{% for warning in extracted.get("warnings", []) %}<li>{{ warning }}</li>{% endfor %}</ul>
+      {% endif %}
+      <label>Confirmed skills <input name="skills" value="{{ ', '.join(extracted.get('skills', [])) }}"></label>
+      <label>Confirmed resume summary <textarea name="confirmed_resume_summary">{{ profile.confirmed_resume_summary or extracted.get('text', '')[:500] }}</textarea></label>
+      <button type="submit">Confirm resume details</button>
+    </form>
+  {% endif %}
 {% endif %}
 <p class="muted">The app does not automatically trust extracted text. Confirm the summary on the Profile page before drafts use it.</p>
 {% endblock %}

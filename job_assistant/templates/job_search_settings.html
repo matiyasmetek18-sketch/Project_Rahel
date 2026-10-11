@@ -12,5 +12,36 @@
   <label><input name="remote_ok" type="checkbox" value="1" {% if settings['remote_ok'] %}checked{% endif %}> Remote jobs are okay</label>
   <button type="submit">Save search settings</button>
 </form>
+
+<h2>Employer job boards</h2>
+<form method="post" action="{{ url_for('add_job_source') }}" class="panel">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>Source type
+    <select name="provider" required>
+      <option value="greenhouse">Greenhouse Job Board API</option>
+      <option value="lever">Lever Postings API</option>
+      <option value="lever_eu">Lever Postings API, EU</option>
+    </select>
+  </label>
+  <label>Employer board identifier <input name="board_identifier" placeholder="example-care" required></label>
+  <label>Display name <input name="display_name" placeholder="Example Care"></label>
+  <button type="submit">Add job board</button>
+</form>
+
+<form method="post" action="{{ url_for('find_jobs') }}" class="panel">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <p>Find Jobs uses only configured public ATS job-board APIs. It does not submit applications.</p>
+  <button type="submit">Find Jobs</button>
+</form>
+
+{% for source in sources %}
+<article class="card">
+  <strong>{{ source["display_name"] or source["board_identifier"] }}</strong>
+  <p>{{ source["provider"] }} · {{ source["board_identifier"] }}</p>
+  <p class="muted">Last status: {{ source["last_status"] or "Not fetched yet" }}</p>
+</article>
+{% else %}
+<p>No employer boards configured yet.</p>
+{% endfor %}
 {% endblock %}
 

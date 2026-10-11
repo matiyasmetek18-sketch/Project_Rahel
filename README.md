@@ -1,6 +1,8 @@
-# Local Job Application Assistant
+# Project Rahel
 
-This is a local-first job-application assistant for Matiyas and Rahel. It stores each person's profile, credentials, resume location, job-search settings, imported jobs, review queue, and application history separately. The app is designed to run on the user's own computer and binds to `127.0.0.1` by default.
+Project Rahel is a local-first Flask/SQLite caregiver job-search assistant for Rahel. It helps find caregiver postings, score them against Rahel's confirmed profile data, prepare truthful application drafts, and track manual submission outcomes.
+
+The app stays local and binds to `127.0.0.1` by default. It does not automate real submissions in the current milestone.
 
 ## Setup
 
@@ -9,12 +11,6 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 cp .env.example .env
 .venv/bin/python -m job_assistant.cli init-db
-```
-
-Create local accounts:
-
-```bash
-.venv/bin/python -m job_assistant.cli create-user matiyas matiyas@example.com
 .venv/bin/python -m job_assistant.cli create-user rahel rahel@example.com
 ```
 
@@ -24,7 +20,7 @@ Run the website:
 .venv/bin/python -m job_assistant.web
 ```
 
-Open `http://127.0.0.1:5000` in your browser.
+Open `http://127.0.0.1:5000`.
 
 Run tests:
 
@@ -32,103 +28,86 @@ Run tests:
 .venv/bin/pytest
 ```
 
-## What Milestone 1 Includes
+## Current Functionality
 
-- A Flask app factory with secure local defaults.
-- Passwords stored as bcrypt hashes.
-- SQLite tables for users, profiles, credentials, resumes, jobs, drafts, approvals, and application events.
-- CSRF protection on forms.
-- Resume upload with PDF/DOCX allowlist and a 5 MB limit.
-- Scoring, easy-apply classification, and draft generation from stored/confirmed data only.
-- Tests for sign-in/session behavior, account separation, approval gate, daily limit, no-fabrication, upload limits, and easy-apply classification.
+- Secure sign-in with bcrypt password hashing, secure session cookies, and CSRF protection.
+- Rahel profile, credentials, work history, résumé upload, job preferences, job feed, review queue, application history, and settings.
+- Private résumé storage under `private/`.
+- PDF/DOCX text extraction with user confirmation before saving extracted skills or summary data.
+- Manual JSON import remains available for permitted postings.
+- Live read-only job discovery from configured employer boards: Greenhouse Job Board API and Lever Postings API.
+- Deterministic caregiver job scoring with explainable reasons.
+- Manual application review, approval, open-to-submit, and user-confirmed outcome tracking.
+- Pause-all and daily-limit safeguards.
+- Offline tests with fictional data and mocked external sources.
 
-## What Milestone 2 Includes
+## Finding Jobs
 
-- A complete server-rendered Flask website with sign in, dashboard, profile, credentials, resume, job-search settings, job feed, review queue, application history, and settings pages.
-- A permitted offline job import workflow using pasted JSON.
-- Per-account job deduplication by source and external id.
-- Application preparation from stored profile data only.
-- A server-side application state machine: `discovered -> prepared -> pending_review -> approved -> opened_for_manual_submission -> submitted / not_submitted`.
-- Rejection and failure states.
-- Manual-only submission flow. The app can open an employer link, but it never claims the application was submitted until the user confirms it.
-- Pause-all and daily-limit enforcement before opening manual applications.
-- Accessible, high-contrast templates with large text, large controls, visible focus, and mobile-friendly layout.
+1. Sign in as Rahel.
+2. Open **Search Settings**.
+3. Enter caregiver preferences such as job titles, locations, minimum pay, and employment types.
+4. Add employer job boards:
+   - Greenhouse: use the public board token from the employer's Greenhouse board.
+   - Lever: use the public Lever site name.
+5. Click **Find Jobs**.
+6. Open **Job Feed** to inspect ranked postings and match explanations.
 
-## Uploading A Resume
+The adapters only read public job postings. They do not submit applications.
 
-1. Sign in.
-2. Open **Resume**.
-3. Upload a PDF or DOCX file no larger than 5 MB.
-4. Open **Profile** and write a confirmed resume summary.
+## Résumé Intelligence
 
-The app stores the file under the private resume folder and does not commit it to git.
+Upload a PDF or DOCX résumé from the **Resume** page. The app extracts candidate information such as skills, education, certifications, and relevant experience. Extracted text is treated as untrusted until Rahel reviews and confirms it.
 
-## Importing Jobs
+No qualification is considered verified just because it appears in an uploaded document.
 
-Milestone 2 uses manual JSON import instead of scraping. Open **Job Feed**, choose **Import jobs**, and paste data like:
+## Application Workflow
 
-```json
-[
-  {
-    "source_site": "manual_import",
-    "external_id": "care-1",
-    "title": "Caregiver",
-    "company": "Example Care",
-    "city": "Lynnwood",
-    "state": "WA",
-    "url": "https://example.test/apply",
-    "description": "Caregiving transfer support companionship",
-    "required_fields": ["name", "email", "phone", "resume"]
-  }
-]
-```
+The current workflow is:
 
-This is deliberate: it gives the project a working job-feed workflow without violating job-site terms or relying on network access during tests.
+`Discover -> Normalize -> Deduplicate -> Match -> Prepare -> Review -> Approve -> Open employer page -> Rahel confirms submitted/not submitted -> Track`
 
-## Reviewing Applications
+Approval is not submission. Opening the employer page is not submission. Only Rahel's confirmation records a submitted application.
 
-1. Open **Job Feed**.
-2. Choose **Prepare for review** on a job.
-3. Open the draft in **Review Queue**.
-4. Read the score, reasons, missing questions, resume summary, cover letter, and form answers.
-5. Edit anything needed.
-6. Type `1` to approve that one application.
-7. Choose **Open to submit manually**.
-8. Submit on the employer site yourself.
-9. Return to the app and choose whether it was submitted or not submitted.
+## Agent Architecture
 
-Approval is not submission. Opening the page is not submission. Only the user's final confirmation records a submitted application.
+The code includes Milestone 3A scaffolding for:
 
-## Adding A New Job Source
+- **Discovery Agent:** read-only job-board discovery from permitted APIs.
+- **Matching Agent:** deterministic caregiver match scoring.
+- **Application Agent:** truthful draft preparation from confirmed data.
+- **Verification Agent:** future pre-submission safety checks.
+- **Tracking Agent:** audit trail and duplicate prevention.
+- **Browser Agent:** intentionally not implemented yet.
 
-Job sources must start disabled. Before writing an adapter, check the site's terms of service and robots.txt. If either is not verified, the adapter docstring must include `TODO: verify terms` and the app must not automate submissions for that site.
+Security-critical decisions, authorization, state transitions, and eligibility checks remain deterministic Python code. AI model use is reserved for future language-understanding tasks and must not receive real applicant information without explicit authorization.
 
-Permitted adapters may read forms and classify postings. If a form needs anything outside stored, confirmed profile data plus a resume upload, the posting is manual. For manual postings, the app prepares information and opens the page for the user to submit.
+## Model Benchmarking
 
-## Decisions And Tradeoffs
+`job_assistant/model_benchmark.py` defines a reproducible fictional caregiver benchmark for comparing future model providers. Real provider integration is not implemented yet. A model must be evaluated on structured requirement extraction, hallucination resistance, latency, cost, and privacy before use with real applicant data.
 
-- **Flask instead of a heavier framework:** Flask keeps the learning surface small for a junior CS student while still supporting secure sessions and server-rendered pages.
-- **SQLite for local storage:** SQLite is built into Python and is enough for a local app used by two people.
-- **bcrypt for passwords:** bcrypt is a standard salted password-hashing library with a small dependency footprint.
-- **Manual JSON import before adapters:** Milestone 2 needs a real feed, but scraping without terms review would be unsafe. JSON import is simple, testable, and honest about where data came from.
-- **No background automation yet:** Milestones 1 and 2 focus on safe data handling and manual review before touching third-party submission flows.
-- **Private resume folder:** Uploaded resumes are stored under `private/`, which is git-ignored, because resumes contain personal data.
-- **Server-side state machine:** Application status changes live in repository methods so tests can enforce the safety rules without depending on browser behavior.
+## Safety Rules
 
-## Audit Notes
-
-The Milestone 1 audit verified password hashing, sessions, CSRF on forms, account isolation, resume upload validation, scoring, drafting, and approval ownership tests. It also found that Milestone 1 documentation described future website behavior that was not yet implemented. Milestone 2 adds the missing website pages, job import/feed workflow, review queue, application history, settings, and manual submission state transitions.
+- Never fabricate credentials, employment history, dates, pay, licenses, or statistics.
+- Never answer sensitive or voluntary demographic questions automatically.
+- Never bypass CAPTCHA, login, MFA, bot checks, or rate limits.
+- Never submit applications through sites whose terms prohibit automation.
+- Store API keys only in environment variables.
+- Keep `.env`, local databases, résumés, cookies, and browser session files out of git.
 
 ## Current Limitations
 
-- Resume extraction is not implemented; users manually confirm the resume summary.
-- There is no live job API integration yet.
-- There are no automated submission adapters.
-- The app is intended for local use on `127.0.0.1`.
-- Accessibility has been designed into the templates, but it still deserves human screen-reader testing.
+- Browser-assisted form filling is not implemented.
+- Autonomous submission is not implemented.
+- Greenhouse and Lever integrations are read-only discovery adapters.
+- Résumé extraction is heuristic and must be confirmed by Rahel.
+- Accessibility has structural support but still needs human screen-reader review.
 
-## Questions Before Milestone 3
+## Before Browser-Assisted Submission
 
-1. Which job sites are permitted for the first adapter?
-2. What daily limits should each account use for each site?
-3. Will this stay only on the user's computer, or should it be hosted publicly later?
+Rahel must approve:
+
+1. Which employers and integrations are allowed.
+2. Which job types, locations, pay ranges, and daily limits are allowed.
+3. Whether browser-assisted filling may operate while she is present.
+4. Whether any integration explicitly permits automated submission.
+5. What information must always require individual review.

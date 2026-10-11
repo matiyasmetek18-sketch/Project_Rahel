@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from .db import get_connection, utc_now
+from .discovery import adapter_for
 from .drafting import make_cover_letter, make_resume_summary
 from .models import Credential, JobPosting, Profile
 from .rules import can_submit_application, classify_easy_apply, score_job
@@ -127,8 +128,9 @@ class Repository:
                 """
                 INSERT INTO job_postings
                 (user_id, source_site, external_id, title, company, city, state, url, description,
-                 required_fields, required_credentials, hourly_pay, employment_type, status, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 required_fields, required_credentials, hourly_pay, employment_type, remote,
+                 source_metadata, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     user_id,
@@ -143,7 +145,9 @@ class Repository:
                     ",".join(job.required_fields),
                     ",".join(job.required_credentials),
                     job.hourly_pay,
-                    "",
+                    job.employment_type,
+                    int(job.remote),
+                    job.source_metadata,
                     DISCOVERED,
                     utc_now(),
                     utc_now(),
@@ -163,7 +167,8 @@ class Repository:
                     """
                     UPDATE job_postings
                     SET title = ?, company = ?, city = ?, state = ?, url = ?, description = ?,
-                        required_fields = ?, required_credentials = ?, hourly_pay = ?, updated_at = ?
+                        required_fields = ?, required_credentials = ?, hourly_pay = ?, employment_type = ?,
+                        remote = ?, source_metadata = ?, updated_at = ?
                     WHERE id = ? AND user_id = ?
                     """,
                     (
@@ -176,6 +181,9 @@ class Repository:
                         ",".join(job.required_fields),
                         ",".join(job.required_credentials),
                         job.hourly_pay,
+                        job.employment_type,
+                        int(job.remote),
+                        job.source_metadata,
                         now,
                         existing["id"],
                         user_id,
@@ -186,8 +194,9 @@ class Repository:
                 """
                 INSERT INTO job_postings
                 (user_id, source_site, external_id, title, company, city, state, url, description,
-                 required_fields, required_credentials, hourly_pay, employment_type, status, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?)
+                 required_fields, required_credentials, hourly_pay, employment_type, remote,
+                 source_metadata, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     user_id,
@@ -202,6 +211,9 @@ class Repository:
                     ",".join(job.required_fields),
                     ",".join(job.required_credentials),
                     job.hourly_pay,
+                    job.employment_type,
+                    int(job.remote),
+                    job.source_metadata,
                     DISCOVERED,
                     now,
                     now,
@@ -351,16 +363,40 @@ class Repository:
                 (resume_summary, cover_letter, form_answers, utc_now(), draft_id, user_id),
             )
 
-    def record_resume(self, user_id: int, original_filename: str, stored_path: str, content_type: str) -> int:
+    def record_resume(
+        self,
+        user_id: int,
+        original_filename: str,
+        stored_path: str,
+        content_type: str,
+        extracted_text: str = "",
+        extracted_json: str = "",
+    ) -> int:
         with get_connection(self.db_path) as conn:
             cur = conn.execute(
                 """
-                INSERT INTO resumes (user_id, original_filename, stored_path, content_type, uploaded_at)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO resumes
+                (user_id, original_filename, stored_path, content_type, uploaded_at, extracted_text, extracted_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (user_id, original_filename, stored_path, content_type, utc_now()),
+                (user_id, original_filename, stored_path, content_type, utc_now(), extracted_text, extracted_json),
             )
             return int(cur.lastrowid)
+
+    def confirm_resume_extraction(self, user_id: int, resume_id: int, summary: str, skills: str) -> None:
+        with get_connection(self.db_path) as conn:
+            row = conn.execute("SELECT id FROM resumes WHERE id = ? AND user_id = ?", (resume_id, user_id)).fetchone()
+            if not row:
+                raise PermissionError("Resume does not belong to this account.")
+            conn.execute("UPDATE resumes SET confirmed = 1 WHERE id = ? AND user_id = ?", (resume_id, user_id))
+            conn.execute(
+                """
+                UPDATE profiles
+                SET confirmed_resume_summary = ?, skills = ?
+                WHERE user_id = ?
+                """,
+                (summary, skills, user_id),
+            )
 
     def approve_draft(self, user_id: int, draft_id: int, confirmation_text: str, approved_count: int = 1) -> int:
         with get_connection(self.db_path) as conn:
@@ -581,6 +617,67 @@ class Repository:
                 (user_id,),
             ).fetchone()
 
+    def add_job_source(self, user_id: int, provider: str, board_identifier: str, display_name: str = "") -> int:
+        now = utc_now()
+        with get_connection(self.db_path) as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO job_sources (user_id, provider, board_identifier, display_name, active, created_at)
+                VALUES (?, ?, ?, ?, 1, ?)
+                ON CONFLICT(user_id, provider, board_identifier)
+                DO UPDATE SET display_name = excluded.display_name, active = 1
+                """,
+                (user_id, provider, board_identifier.strip(), display_name.strip(), now),
+            )
+            if cur.lastrowid:
+                return int(cur.lastrowid)
+            row = conn.execute(
+                "SELECT id FROM job_sources WHERE user_id = ? AND provider = ? AND board_identifier = ?",
+                (user_id, provider, board_identifier.strip()),
+            ).fetchone()
+            return int(row["id"])
+
+    def list_job_sources(self, user_id: int):
+        with get_connection(self.db_path) as conn:
+            return conn.execute(
+                "SELECT * FROM job_sources WHERE user_id = ? ORDER BY provider, display_name, board_identifier",
+                (user_id,),
+            ).fetchall()
+
+    def fetch_jobs_from_sources(self, user_id: int) -> dict[str, int | list[str]]:
+        created = 0
+        updated = 0
+        found = 0
+        errors: list[str] = []
+        sources = self.list_job_sources(user_id)
+        for source in sources:
+            if not source["active"]:
+                continue
+            try:
+                result = adapter_for(source["provider"]).fetch_jobs(source["board_identifier"])
+                found += len(result.jobs)
+                for job in result.jobs:
+                    _, was_created = self.upsert_job(user_id, job)
+                    created += int(was_created)
+                    updated += int(not was_created)
+                self.update_job_source_status(user_id, source["id"], result.source_status)
+            except Exception as exc:
+                message = str(exc)
+                errors.append(f"{source['provider']} {source['board_identifier']}: {message}")
+                self.update_job_source_status(user_id, source["id"], message)
+        return {"found": found, "created": created, "updated": updated, "errors": errors}
+
+    def update_job_source_status(self, user_id: int, source_id: int, status: str) -> None:
+        with get_connection(self.db_path) as conn:
+            conn.execute(
+                """
+                UPDATE job_sources
+                SET last_status = ?, last_fetched_at = ?
+                WHERE id = ? AND user_id = ?
+                """,
+                (status, utc_now(), source_id, user_id),
+            )
+
 
 def split_csv(value: str) -> tuple[str, ...]:
     return tuple(item.strip() for item in value.split(",") if item.strip())
@@ -599,6 +696,9 @@ def row_to_job(row) -> JobPosting:
         required_fields=split_csv(row["required_fields"]),
         required_credentials=split_csv(row["required_credentials"]),
         hourly_pay=row["hourly_pay"],
+        employment_type=row["employment_type"],
+        remote=bool(row["remote"]),
+        source_metadata=row["source_metadata"],
     )
 
 

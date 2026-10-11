@@ -37,11 +37,11 @@ def make_prepared_draft(repo: Repository, user_id: int) -> int:
 
 
 def test_job_deduplication_is_per_account(repo: Repository):
-    matiyas = repo.create_user("matiyas", "matiyas@example.com", "a-very-safe-password")
+    reviewer = repo.create_user("reviewer", "reviewer@example.com", "a-very-safe-password")
     rahel = repo.create_user("rahel", "rahel@example.com", "another-safe-password")
     job = JobPosting("manual_import", "same-id", "Role", "Company", "Seattle", "WA", "https://example.test")
-    assert repo.upsert_job(matiyas, job) == (1, True)
-    assert repo.upsert_job(matiyas, job) == (1, False)
+    assert repo.upsert_job(reviewer, job) == (1, True)
+    assert repo.upsert_job(reviewer, job) == (1, False)
     other_id, created = repo.upsert_job(rahel, job)
     assert created is True
     assert other_id != 1
