@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Onboarding{% endblock %}
+{% block body %}
+<h1>Rahel onboarding</h1>
+<p class="muted">Complete these items before preparing real applications. The app only uses information Rahel has confirmed.</p>
+
+<section class="grid" aria-label="Readiness checklist">
+  <article class="card">
+    <h2>{% if status["profile"] %}Ready{% else %}Needs info{% endif %}</h2>
+    <p>Basic profile: name, phone, city, and state.</p>
+    <a class="button secondary" href="{{ url_for('profile') }}">Edit profile</a>
+  </article>
+  <article class="card">
+    <h2>{% if status["preferences"] %}Ready{% else %}Needs info{% endif %}</h2>
+    <p>Caregiver preferences: job types, locations, pay, and availability.</p>
+    <a class="button secondary" href="{{ url_for('profile') }}">Edit preferences</a>
+  </article>
+  <article class="card">
+    <h2>{% if status["resume"] %}Ready{% else %}Needs confirmation{% endif %}</h2>
+    <p>Resume summary confirmed by Rahel after extraction.</p>
+    <a class="button secondary" href="{{ url_for('resume_upload') }}">Upload or confirm resume</a>
+  </article>
+  <article class="card">
+    <h2>{% if status["sources"] %}Ready{% else %}Needs sources{% endif %}</h2>
+    <p>Public employer boards configured for read-only discovery.</p>
+    <a class="button secondary" href="{{ url_for('job_search_settings') }}">Manage boards</a>
+  </article>
+</section>
+
+<form method="post" action="{{ url_for('add_recommended_sources') }}" class="panel">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <h2>Recommended Washington caregiver boards</h2>
+  <p>Add the public boards validated for this MVP: myLaurel, BAYADA, and Distro. Discovery remains read-only and does not submit applications.</p>
+  <button type="submit">Add recommended boards</button>
+</form>
+
+<section class="panel">
+  <h2>Current sources</h2>
+  {% for source in sources %}
+    <p><strong>{{ source["display_name"] or source["board_identifier"] }}</strong>: {{ source["provider"] }} · {{ source["board_identifier"] }} · {{ source["last_status"] or "not fetched yet" }}</p>
+  {% else %}
+    <p>No employer boards configured yet.</p>
+  {% endfor %}
+</section>
+
+<div class="actions">
+  <a class="button" href="{{ url_for('job_search_settings') }}">Configure search</a>
+  <a class="button secondary" href="{{ url_for('job_feed') }}">Find and review jobs</a>
+</div>
+{% endblock %}

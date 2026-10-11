@@ -24,6 +24,7 @@ def test_required_pages_render_for_signed_in_user(client, repo: Repository):
     sign_in(client, repo)
     for path, expected in [
         ("/dashboard", "Dashboard"),
+        ("/onboarding", "Rahel onboarding"),
         ("/profile", "Profile"),
         ("/credentials", "Credentials"),
         ("/resume", "Resume"),
@@ -53,6 +54,33 @@ def test_job_import_prepare_review_flow(client, repo: Repository):
             "zip_code": "98036",
             "acceptable_cities": "Lynnwood",
             "confirmed_resume_summary": "Experienced caregiver.",
+            "skills": "caregiving, transfers",
+            "availability": "weekdays",
+            "job_types": "caregiver",
+            "minimum_hourly_pay": "20",
+        },
+    )
+    html = client.get("/profile").get_data(as_text=True)
+    token = csrf_from(html)
+    client.post(
+        "/profile",
+        data={
+            "csrf_token": token,
+            "full_name": "Rahel Example",
+            "phone": "555-0100",
+            "city": "Lynnwood",
+            "state": "WA",
+            "zip_code": "98036",
+            "acceptable_cities": "Lynnwood",
+            "confirmed_resume_summary": "Experienced caregiver.",
+            "skills": "caregiving, transfers",
+            "availability": "weekdays",
+            "job_types": "caregiver",
+            "minimum_hourly_pay": "20",
+            "employer": "Fictional Care",
+            "title": "Caregiver",
+            "start_date": "2024-01-01",
+            "tasks": "Companionship and transfers",
         },
     )
     html = client.get("/jobs/import").get_data(as_text=True)
@@ -79,6 +107,19 @@ def test_job_import_prepare_review_flow(client, repo: Repository):
     body = response.get_data(as_text=True)
     assert "Application type" in body
     assert "easy apply" in body
+    assert "Fictional Care" in body
+    assert "Audit log" in body
+
+
+def test_onboarding_can_add_recommended_sources(client, repo: Repository):
+    sign_in(client, repo)
+    html = client.get("/onboarding").get_data(as_text=True)
+    token = csrf_from(html)
+    response = client.post("/onboarding/recommended-sources", data={"csrf_token": token}, follow_redirects=True)
+    body = response.get_data(as_text=True)
+    assert "Recommended public caregiver job boards added" in body
+    assert "myLaurel" in body
+    assert len(repo.list_job_sources(1)) == 3
 
 
 def test_logout_requires_csrf(client, repo: Repository):

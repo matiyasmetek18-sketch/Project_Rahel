@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .db import get_connection, utc_now
 from .discovery import adapter_for
-from .drafting import make_cover_letter, make_resume_summary
+from .drafting import make_cover_letter, make_form_answers, make_resume_summary
 from .models import Credential, JobPosting, Profile
 from .rules import can_submit_application, classify_easy_apply, score_job
 from .security import hash_password, verify_password
@@ -276,6 +276,7 @@ class Repository:
         profile = self.profile_for_user(user_id)
         credentials = self.credentials_for_user(user_id)
         settings = self.search_settings(user_id)
+        work_history = self.work_history_rows(user_id)
         with get_connection(self.db_path) as conn:
             job_row = conn.execute("SELECT * FROM job_postings WHERE id = ? AND user_id = ?", (job_id, user_id)).fetchone()
             if not job_row:
@@ -285,6 +286,7 @@ class Repository:
             scored = score_job_with_settings(profile, credentials, job, settings)
             resume_summary, resume_questions = make_resume_summary(profile)
             cover_letter, cover_questions = make_cover_letter(profile, job)
+            form_answers = make_form_answers(profile, work_history)
             questions = tuple(classification.unanswered_questions) + tuple(resume_questions) + tuple(cover_questions)
             now = utc_now()
             existing = conn.execute(
@@ -307,7 +309,7 @@ class Repository:
                         json.dumps(questions),
                         resume_summary,
                         cover_letter,
-                        json.dumps({}),
+                        form_answers,
                         PENDING_REVIEW,
                         now,
                         draft_id,
@@ -331,7 +333,7 @@ class Repository:
                         json.dumps(questions),
                         resume_summary,
                         cover_letter,
-                        json.dumps({}),
+                        form_answers,
                         PENDING_REVIEW,
                         now,
                         now,
@@ -376,6 +378,18 @@ class Repository:
                 """,
                 (draft_id, user_id),
             ).fetchone()
+
+    def draft_events(self, user_id: int, draft_id: int):
+        with get_connection(self.db_path) as conn:
+            return conn.execute(
+                """
+                SELECT event_type, message, created_at
+                FROM application_events
+                WHERE user_id = ? AND draft_id = ?
+                ORDER BY created_at ASC, id ASC
+                """,
+                (user_id, draft_id),
+            ).fetchall()
 
     def update_draft_text(self, user_id: int, draft_id: int, resume_summary: str, cover_letter: str, form_answers: str) -> None:
         with get_connection(self.db_path) as conn:
@@ -437,7 +451,7 @@ class Repository:
             transition = can_transition(owner["status"], APPROVED)
             if not transition.ok:
                 raise ValueError(transition.message)
-            if has_unanswered_questions(owner["unanswered_questions"]) and not has_meaningful_form_answers(owner["form_answers"]):
+            if has_unanswered_questions(owner["unanswered_questions"]) and not form_answers_cover_questions(owner["unanswered_questions"], owner["form_answers"]):
                 raise ValueError("Answer the listed required questions before approving this application.")
             cur = conn.execute(
                 """
@@ -541,6 +555,22 @@ class Repository:
                 (user_id,),
             ).fetchall()
 
+    def recent_application_events(self, user_id: int, limit: int = 20):
+        with get_connection(self.db_path) as conn:
+            return conn.execute(
+                """
+                SELECT application_events.event_type, application_events.message, application_events.created_at,
+                       job_postings.title, job_postings.company
+                FROM application_events
+                LEFT JOIN application_drafts ON application_drafts.id = application_events.draft_id
+                LEFT JOIN job_postings ON job_postings.id = application_drafts.job_id
+                WHERE application_events.user_id = ?
+                ORDER BY application_events.created_at DESC, application_events.id DESC
+                LIMIT ?
+                """,
+                (user_id, limit),
+            ).fetchall()
+
     def dashboard_counts(self, user_id: int) -> dict[str, int]:
         with get_connection(self.db_path) as conn:
             jobs = conn.execute("SELECT COUNT(*) AS count FROM job_postings WHERE user_id = ?", (user_id,)).fetchone()["count"]
@@ -554,6 +584,16 @@ class Repository:
             ).fetchone()["count"]
             history = conn.execute("SELECT COUNT(*) AS count FROM application_drafts WHERE user_id = ?", (user_id,)).fetchone()["count"]
         return {"jobs": int(jobs), "pending": int(pending), "approved": int(approved), "history": int(history)}
+
+    def onboarding_status(self, user_id: int) -> dict[str, bool]:
+        profile = self.profile_for_user(user_id)
+        return {
+            "profile": bool(profile.full_name and profile.phone and profile.city and profile.state),
+            "preferences": bool(profile.acceptable_cities and profile.job_types and profile.minimum_hourly_pay is not None and profile.availability),
+            "resume": bool(profile.confirmed_resume_summary),
+            "sources": bool(self.list_job_sources(user_id)),
+            "jobs": bool(self.list_jobs(user_id)),
+        }
 
     def credentials_rows(self, user_id: int):
         with get_connection(self.db_path) as conn:
@@ -794,3 +834,34 @@ def has_meaningful_form_answers(value: str) -> bool:
     if isinstance(parsed, list):
         return any(str(item).strip() for item in parsed)
     return bool(str(parsed).strip())
+
+
+def unanswered_question_items(value: str) -> list[str]:
+    if not value:
+        return []
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return [value.strip()] if value.strip() else []
+    if isinstance(parsed, list):
+        return [str(item).strip() for item in parsed if str(item).strip()]
+    if isinstance(parsed, dict):
+        return [str(key).strip() for key, val in parsed.items() if str(key).strip() and str(val).strip()]
+    item = str(parsed).strip()
+    return [item] if item else []
+
+
+def form_answers_cover_questions(unanswered: str, answers: str) -> bool:
+    questions = unanswered_question_items(unanswered)
+    if not questions:
+        return True
+    if not has_meaningful_form_answers(answers):
+        return False
+    normalized_answers = answers.lower()
+    for question in questions:
+        key = question.lower().strip()
+        if ":" in key:
+            key = key.split(":", 1)[0].strip()
+        if key not in normalized_answers:
+            return False
+    return True

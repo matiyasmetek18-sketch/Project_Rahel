@@ -12,5 +12,15 @@
   {% endfor %}
   </tbody>
 </table>
+<h2>Recent audit events</h2>
+{% for event in events %}
+  <article class="card">
+    <strong>{{ event["event_type"] }}</strong> · {{ event["created_at"] }}
+    <p>{{ event["title"] or "Application" }}{% if event["company"] %} at {{ event["company"] }}{% endif %}</p>
+    <p>{{ event["message"] }}</p>
+  </article>
+{% else %}
+  <p>No audit events yet.</p>
+{% endfor %}
 {% endblock %}
 

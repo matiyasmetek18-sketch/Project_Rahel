@@ -30,13 +30,13 @@ This project is a local-first caregiver job-search assistant for Rahel.
 
 ## Current Milestone
 
-Milestone 3A focuses on:
+Final MVP focuses on:
 
 - Rahel-only caregiver job-search scope.
 - Read-only live discovery through Greenhouse and Lever public job-posting APIs.
 - Résumé PDF/DOCX extraction with user confirmation.
 - Improved deterministic caregiver matching.
-- Agent architecture scaffolding.
+- Browser-based onboarding, review, approval, manual submission confirmation, and audit history.
 - No browser automation.
 - No autonomous real submissions.
 
@@ -47,9 +47,12 @@ Milestone 3A focuses on:
 - Imported/fetched jobs are normalized and deduplicated per account by source and external id.
 - The job feed ranks postings deterministically and explains match scores before applications are prepared.
 - Jobs missing from later source fetches are marked stale instead of silently disappearing.
+- The onboarding page guides Rahel through profile, preferences, résumé confirmation, and public job-board setup.
+- Application drafts include editable confirmed profile/work-history notes and a deterministic cover letter.
 - Application drafts move through the server-side state machine: `discovered`, `prepared`, `pending_review`, `approved`, `opened_for_manual_submission`, `submitted`, `not_submitted`, `rejected`, and `failed`.
 - Opening an employer page records only `opened_for_manual_submission`.
 - Only Rahel can confirm a manual submission outcome.
+- Application events are visible in review and history pages.
 - Pause-all and daily limits are enforced before opening a manual application page.
 - Logout and all mutating forms require CSRF tokens.
 - Tests are offline and use fictional data only.
@@ -60,4 +63,5 @@ Milestone 3A focuses on:
 - Autonomous submission is not implemented.
 - AI provider integration is not implemented.
 - Résumé extraction is heuristic and must be confirmed by Rahel.
+- Real employer form automation is unsupported unless a future employer-specific integration is demonstrably permitted.
 - The UI is accessible and responsive, but it has not been tested with a screen reader by a human.
