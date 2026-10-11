@@ -222,8 +222,10 @@ class Repository:
             return int(cur.lastrowid), True
 
     def list_jobs(self, user_id: int):
+        profile = self.profile_for_user(user_id)
+        credentials = self.credentials_for_user(user_id)
         with get_connection(self.db_path) as conn:
-            return conn.execute(
+            rows = conn.execute(
                 """
                 SELECT job_postings.*,
                        application_drafts.id AS draft_id,
@@ -240,6 +242,18 @@ class Repository:
                 """,
                 (user_id,),
             ).fetchall()
+        ranked = []
+        for row in rows:
+            if row["draft_id"] is not None:
+                score = row["score"]
+                reasons = row["reasons"]
+            else:
+                scored = score_job(profile, credentials, row_to_job(row))
+                score = scored.value
+                reasons = json.dumps(scored.reasons)
+            ranked.append({"row": row, "feed_score": score, "feed_reasons": reasons})
+        ranked.sort(key=lambda item: (-int(item["feed_score"]), item["row"]["created_at"], item["row"]["id"]))
+        return ranked
 
     def get_job(self, user_id: int, job_id: int):
         with get_connection(self.db_path) as conn:
@@ -656,16 +670,39 @@ class Repository:
             try:
                 result = adapter_for(source["provider"]).fetch_jobs(source["board_identifier"])
                 found += len(result.jobs)
+                seen_external_ids: set[str] = set()
                 for job in result.jobs:
+                    seen_external_ids.add(job.external_id)
                     _, was_created = self.upsert_job(user_id, job)
                     created += int(was_created)
                     updated += int(not was_created)
+                stale = self.mark_stale_jobs_for_source(user_id, f"{source['provider']}:{source['board_identifier']}", seen_external_ids)
                 self.update_job_source_status(user_id, source["id"], result.source_status)
+                updated += stale
             except Exception as exc:
                 message = str(exc)
                 errors.append(f"{source['provider']} {source['board_identifier']}: {message}")
                 self.update_job_source_status(user_id, source["id"], message)
         return {"found": found, "created": created, "updated": updated, "errors": errors}
+
+    def mark_stale_jobs_for_source(self, user_id: int, source_site: str, current_external_ids: set[str]) -> int:
+        if not current_external_ids:
+            return 0
+        with get_connection(self.db_path) as conn:
+            rows = conn.execute(
+                """
+                SELECT id, external_id FROM job_postings
+                WHERE user_id = ? AND source_site = ? AND status != 'stale'
+                """,
+                (user_id, source_site),
+            ).fetchall()
+            stale_ids = [row["id"] for row in rows if row["external_id"] not in current_external_ids]
+            for job_id in stale_ids:
+                conn.execute(
+                    "UPDATE job_postings SET status = 'stale', exclusion_reason = ?, updated_at = ? WHERE id = ? AND user_id = ?",
+                    ("No longer returned by the configured job board.", utc_now(), job_id, user_id),
+                )
+            return len(stale_ids)
 
     def update_job_source_status(self, user_id: int, source_id: int, status: str) -> None:
         with get_connection(self.db_path) as conn:

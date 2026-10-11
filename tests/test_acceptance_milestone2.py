@@ -95,7 +95,7 @@ def test_full_manual_application_acceptance_flow_and_account_isolation(client, r
         follow_redirects=True,
     )
     assert "Imported 1 new jobs" in response.get_data(as_text=True)
-    assert "Score" not in response.get_data(as_text=True)
+    assert "Score:" in response.get_data(as_text=True)
 
     html = client.get("/jobs").get_data(as_text=True)
     token = csrf_from(html)

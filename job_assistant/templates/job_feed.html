@@ -11,17 +11,18 @@
   <a class="button secondary" href="{{ url_for('import_jobs') }}">Import JSON</a>
 </div>
 {% for job in jobs %}
+{% set row = job["row"] %}
 <article class="card">
-  <h2>{{ job["title"] }} at {{ job["company"] }}</h2>
-  <p>{{ job["city"] }} {{ job["state"] }}{% if job["remote"] %} · Remote{% endif %} · Source: {{ job["source_site"] }} · <span class="status">{{ job["draft_status"] or job["status"] }}</span></p>
-  {% if job["score"] is not none %}<p><strong>Score:</strong> {{ job["score"] }}/100</p>{% endif %}
-  {% if job["label"] %}<p><strong>Application type:</strong> {{ job["label"] }}</p>{% endif %}
-  {% if job["reasons"] %}<ul>{% for reason in job["reasons"]|json_items %}<li>{{ reason }}</li>{% endfor %}</ul>{% endif %}
-  {% if job["exclusion_reason"] %}<p class="flash error">Exclusion: {{ job["exclusion_reason"] }}</p>{% endif %}
-  <form method="post" action="{{ url_for('prepare_job', job_id=job['id']) }}" class="actions">
+  <h2>{{ row["title"] }} at {{ row["company"] }}</h2>
+  <p>{{ row["city"] }} {{ row["state"] }}{% if row["remote"] %} · Remote{% endif %} · Source: {{ row["source_site"] }} · <span class="status">{{ row["draft_status"] or row["status"] }}</span></p>
+  <p><strong>Score:</strong> {{ job["feed_score"] }}/100</p>
+  {% if row["label"] %}<p><strong>Application type:</strong> {{ row["label"] }}</p>{% endif %}
+  <ul>{% for reason in job["feed_reasons"]|json_items %}<li>{{ reason }}</li>{% endfor %}</ul>
+  {% if row["exclusion_reason"] %}<p class="flash error">Exclusion: {{ row["exclusion_reason"] }}</p>{% endif %}
+  <form method="post" action="{{ url_for('prepare_job', job_id=row['id']) }}" class="actions">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <button type="submit">Prepare for review</button>
-    {% if job["draft_id"] %}<a class="button secondary" href="{{ url_for('review_detail', draft_id=job['draft_id']) }}">Open draft</a>{% endif %}
+    {% if row["draft_id"] %}<a class="button secondary" href="{{ url_for('review_detail', draft_id=row['draft_id']) }}">Open draft</a>{% endif %}
   </form>
 </article>
 {% else %}

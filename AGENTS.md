@@ -45,6 +45,8 @@ Milestone 3A focuses on:
 - The website uses Flask and server-rendered Jinja templates with minimal JavaScript.
 - Job discovery supports manual JSON import plus configured Greenhouse/Lever employer boards.
 - Imported/fetched jobs are normalized and deduplicated per account by source and external id.
+- The job feed ranks postings deterministically and explains match scores before applications are prepared.
+- Jobs missing from later source fetches are marked stale instead of silently disappearing.
 - Application drafts move through the server-side state machine: `discovered`, `prepared`, `pending_review`, `approved`, `opened_for_manual_submission`, `submitted`, `not_submitted`, `rejected`, and `failed`.
 - Opening an employer page records only `opened_for_manual_submission`.
 - Only Rahel can confirm a manual submission outcome.
