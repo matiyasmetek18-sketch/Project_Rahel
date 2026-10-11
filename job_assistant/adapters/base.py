@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import ssl
 from dataclasses import dataclass
 from typing import Protocol
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
+import certifi
 
 from job_assistant.models import JobPosting
 
@@ -34,9 +37,12 @@ class Transport(Protocol):
 
 class UrlLibTransport:
     def get_json(self, url: str, headers: dict[str, str] | None = None) -> object:
-        request = Request(url, headers=headers or {})
+        request_headers = {"User-Agent": "ProjectRahel/1.0 (+local caregiver job discovery)"}
+        request_headers.update(headers or {})
+        request = Request(url, headers=request_headers)
+        context = ssl.create_default_context(cafile=certifi.where())
         try:
-            with urlopen(request, timeout=15) as response:
+            with urlopen(request, timeout=15, context=context) as response:
                 return json.loads(response.read().decode("utf-8"))
         except HTTPError as exc:
             if exc.code == 429:

@@ -30,7 +30,13 @@ def test_greenhouse_adapter_normalizes_jobs():
                         "title": "In-Home Caregiver",
                         "absolute_url": "https://boards.greenhouse.io/example/jobs/123",
                         "location": {"name": "Lynnwood, WA"},
-                        "content": "<p>Caregiving transfers companionship</p>",
+                        "company_name": "Example Care",
+                        "content": "<p>Caregiving transfers companionship $24 per hour</p>",
+                        "metadata": [
+                            {"name": "Employment Type", "value": "Part-time"},
+                            {"name": "Job Category", "value": "Personal Care"},
+                            {"name": "Remote", "value": False},
+                        ],
                     }
                 ]
             }
@@ -39,6 +45,10 @@ def test_greenhouse_adapter_normalizes_jobs():
     result = adapter.fetch_jobs("example")
     assert result.jobs[0].source_site == "greenhouse:example"
     assert result.jobs[0].city == "Lynnwood"
+    assert result.jobs[0].company == "Example Care"
+    assert result.jobs[0].employment_type == "Part-time"
+    assert result.jobs[0].hourly_pay == 24
+    assert result.jobs[0].remote is False
     assert "Caregiving" in result.jobs[0].description
 
 
@@ -50,9 +60,11 @@ def test_lever_adapter_normalizes_jobs():
                     "id": "abc",
                     "text": "Companion Caregiver",
                     "hostedUrl": "https://jobs.lever.co/example/abc",
+                    "applyUrl": "https://jobs.lever.co/example/abc/apply",
                     "categories": {"location": "Everett, WA", "commitment": "Full-time"},
                     "description": "<p>Companionship care</p>",
                     "lists": [{"content": "<p>CPR helpful</p>"}],
+                    "salaryRange": {"min": 22, "max": 25, "interval": "per-hour-wage"},
                 }
             ]
         )
@@ -60,6 +72,8 @@ def test_lever_adapter_normalizes_jobs():
     result = adapter.fetch_jobs("example")
     assert result.jobs[0].source_site == "lever:example"
     assert result.jobs[0].employment_type == "Full-time"
+    assert result.jobs[0].url.endswith("/apply")
+    assert result.jobs[0].hourly_pay == 22
     assert "CPR" in result.jobs[0].description
 
 

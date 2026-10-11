@@ -2,6 +2,16 @@
 {% block title %}Job Feed{% endblock %}
 {% block body %}
 <h1>Job feed</h1>
+<section class="panel">
+  <h2>Discovery summary</h2>
+  <p>
+    Valid listings: {{ metrics["valid_listings"] }} ·
+    Relevant: {{ metrics["relevant_listings"] }} ·
+    Likely eligible: {{ metrics["likely_eligible"] }} ·
+    Unknown qualifications: {{ metrics["unknown_qualification"] }} ·
+    Stale: {{ metrics["stale_listings"] }}
+  </p>
+</section>
 <div class="actions">
   <form method="post" action="{{ url_for('find_jobs') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -15,14 +25,16 @@
 <article class="card">
   <h2>{{ row["title"] }} at {{ row["company"] }}</h2>
   <p>{{ row["city"] }} {{ row["state"] }}{% if row["remote"] %} · Remote{% endif %} · Source: {{ row["source_site"] }} · <span class="status">{{ row["draft_status"] or row["status"] }}</span></p>
+  <p class="muted">Employment: {{ row["employment_type"] or "Unknown" }} · Pay: {% if row["hourly_pay"] %}${{ "%.2f"|format(row["hourly_pay"]) }}/hr{% else %}Unknown{% endif %} · Updated: {{ row["updated_at"] }}</p>
   <p><strong>Score:</strong> {{ job["feed_score"] }}/100</p>
   {% if row["label"] %}<p><strong>Application type:</strong> {{ row["label"] }}</p>{% endif %}
   <ul>{% for reason in job["feed_reasons"]|json_items %}<li>{{ reason }}</li>{% endfor %}</ul>
-  {% if row["exclusion_reason"] %}<p class="flash error">Exclusion: {{ row["exclusion_reason"] }}</p>{% endif %}
+  {% if job["feed_exclusion"] %}<p class="flash error">Eligibility blocker: {{ job["feed_exclusion"] }}</p>{% endif %}
   <form method="post" action="{{ url_for('prepare_job', job_id=row['id']) }}" class="actions">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <button type="submit">Prepare for review</button>
     {% if row["draft_id"] %}<a class="button secondary" href="{{ url_for('review_detail', draft_id=row['draft_id']) }}">Open draft</a>{% endif %}
+    <a class="button secondary" href="{{ row['url'] }}" target="_blank" rel="noopener noreferrer">Employer page</a>
   </form>
 </article>
 {% else %}

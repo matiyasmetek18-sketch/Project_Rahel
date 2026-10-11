@@ -242,7 +242,11 @@ def create_app(config_object: type[Config] = Config) -> Flask:
         result = g.repo.fetch_jobs_from_sources(g.user["id"])
         for error in result["errors"]:
             flash(error, "error")
-        flash(f"Found {result['found']} postings. Added {result['created']} and updated {result['updated']}.", "success")
+        flash(
+            f"Found {result['found']} postings. Added {result['created']}, updated {result['updated']}, "
+            f"duplicates {result['duplicates']}, stale {result['stale']}.",
+            "success",
+        )
         return redirect(url_for("job_feed"))
 
     @app.route("/jobs/import", methods=["GET", "POST"])
@@ -266,7 +270,7 @@ def create_app(config_object: type[Config] = Config) -> Flask:
     @app.get("/jobs")
     @login_required
     def job_feed():
-        return render_template("job_feed.html", jobs=g.repo.list_jobs(g.user["id"]))
+        return render_template("job_feed.html", jobs=g.repo.list_jobs(g.user["id"]), metrics=g.repo.job_feed_metrics(g.user["id"]))
 
     @app.post("/jobs/<int:job_id>/prepare")
     @login_required
