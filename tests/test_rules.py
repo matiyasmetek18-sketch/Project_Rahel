@@ -74,3 +74,65 @@ def test_caregiver_scoring_explains_missing_information_and_matches():
     assert any("City matches" in reason for reason in result.reasons)
     assert any("Skills match" in reason for reason in result.reasons)
 
+
+def test_city_match_requires_state_consistency_when_state_is_known():
+    profile = Profile(
+        "Rahel Example",
+        "rahel@example.com",
+        state="WA",
+        acceptable_cities=("Bellevue",),
+        minimum_hourly_pay=20,
+        job_types=("caregiver",),
+    )
+    job = JobPosting(
+        "greenhouse:bayada",
+        "pa-bellevue",
+        "Home Caregiver",
+        "Example Care",
+        "Bellevue",
+        "PA",
+        "https://example.test/apply",
+        "Home care caregiver companionship",
+        hourly_pay=24,
+    )
+    result = score_job(profile, [], job)
+    assert not any("City matches" in reason for reason in result.reasons)
+    assert any("outside" in reason for reason in result.reasons)
+
+
+def test_licensed_roles_require_verified_credentials_from_posting_text():
+    profile = Profile("Rahel Example", "rahel@example.com", state="WA", acceptable_cities=("Everett",), minimum_hourly_pay=20)
+    job = JobPosting(
+        "lever:example",
+        "nurse-practitioner",
+        "Home-Based Acute Care Nurse Practitioner",
+        "Example Health",
+        "Everett",
+        "WA",
+        "https://example.test/apply",
+        "Nurse Practitioner role delivering in-home care.",
+        hourly_pay=100,
+    )
+    result = score_job(profile, [], job)
+    assert result.value == 0
+    assert result.exclusion_reason == "missing_credential"
+    assert "Nurse Practitioner" in result.reasons[0]
+
+
+def test_admin_titles_with_home_care_context_are_not_direct_caregiver_matches():
+    profile = Profile("Rahel Example", "rahel@example.com", state="WA", acceptable_cities=("Seattle",), minimum_hourly_pay=20)
+    job = JobPosting(
+        "greenhouse:example",
+        "counsel",
+        "Manager, Senior Counsel",
+        "Example Home Care",
+        "Seattle",
+        "WA",
+        "https://example.test/apply",
+        "Company provides home care and caregiver services.",
+        hourly_pay=50,
+    )
+    result = score_job(profile, [], job, preferred_titles=("caregiver", "care navigator"), search_keywords=("home care",))
+    assert result.value == 0
+    assert result.exclusion_reason == "not_caregiver_role"
+

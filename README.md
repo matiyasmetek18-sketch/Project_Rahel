@@ -37,6 +37,7 @@ Run tests:
 - Manual JSON import remains available for permitted postings.
 - Live read-only job discovery from configured employer boards: Greenhouse Job Board API and Lever Postings API.
 - Deterministic caregiver job scoring with explainable reasons, shown directly in the job feed before drafts are prepared.
+- Feed-level discovery metrics for valid listings, relevant listings, likely eligibility, unknown qualifications, and stale postings.
 - Stale posting detection when a previously fetched job no longer appears in a configured employer feed.
 - Manual application review, approval, open-to-submit, and user-confirmed outcome tracking.
 - Pause-all and daily-limit safeguards.
@@ -54,6 +55,16 @@ Run tests:
 6. Open **Job Feed** to inspect ranked postings, match explanations, missing information, and stale-listing warnings.
 
 The adapters only read public job postings. They do not submit applications.
+
+### Milestone 4 Validation
+
+Read-only validation on October 10, 2026 used genuine public ATS feeds:
+
+- Greenhouse `bayada`: 2,545 active postings, 12 Washington/remote postings, 213 caregiver-relevant postings, 0 likely eligible for the fictional profile. Most blockers were missing licensed nursing credentials.
+- Lever `mylaurelhealth`: 4 active postings, 4 Washington/remote postings, 1 caregiver-relevant and likely eligible posting: Care Navigator in Seattle at $22/hour.
+- Lever `distro`: 165 active postings, 10 Washington/remote postings, 25 caregiver-relevant postings, 0 likely eligible for the fictional profile.
+
+Duplicate rate was 0 across these feeds during validation. Source failures were 0 after adding an explicit CA bundle for HTTPS verification. The validation profile was fictional and did not use real applicant data.
 
 ## Résumé Intelligence
 

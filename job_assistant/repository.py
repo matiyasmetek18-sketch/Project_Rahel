@@ -224,6 +224,7 @@ class Repository:
     def list_jobs(self, user_id: int):
         profile = self.profile_for_user(user_id)
         credentials = self.credentials_for_user(user_id)
+        settings = self.search_settings(user_id)
         with get_connection(self.db_path) as conn:
             rows = conn.execute(
                 """
@@ -247,13 +248,25 @@ class Repository:
             if row["draft_id"] is not None:
                 score = row["score"]
                 reasons = row["reasons"]
+                exclusion_reason = row["exclusion_reason"]
             else:
-                scored = score_job(profile, credentials, row_to_job(row))
+                scored = score_job_with_settings(profile, credentials, row_to_job(row), settings)
                 score = scored.value
                 reasons = json.dumps(scored.reasons)
-            ranked.append({"row": row, "feed_score": score, "feed_reasons": reasons})
+                exclusion_reason = scored.exclusion_reason or row["exclusion_reason"]
+            ranked.append({"row": row, "feed_score": score, "feed_reasons": reasons, "feed_exclusion": exclusion_reason})
         ranked.sort(key=lambda item: (-int(item["feed_score"]), item["row"]["created_at"], item["row"]["id"]))
         return ranked
+
+    def job_feed_metrics(self, user_id: int) -> dict[str, int]:
+        jobs = self.list_jobs(user_id)
+        return {
+            "valid_listings": len(jobs),
+            "relevant_listings": sum(1 for job in jobs if job["feed_exclusion"] != "not_caregiver_role" and int(job["feed_score"]) > 0),
+            "likely_eligible": sum(1 for job in jobs if not job["feed_exclusion"] and int(job["feed_score"]) >= 60),
+            "stale_listings": sum(1 for job in jobs if job["row"]["status"] == "stale"),
+            "unknown_qualification": sum(1 for job in jobs if "Missing profile information" in job["feed_reasons"] or "confirm" in job["feed_reasons"].lower()),
+        }
 
     def get_job(self, user_id: int, job_id: int):
         with get_connection(self.db_path) as conn:
@@ -262,13 +275,14 @@ class Repository:
     def prepare_job(self, user_id: int, job_id: int) -> int:
         profile = self.profile_for_user(user_id)
         credentials = self.credentials_for_user(user_id)
+        settings = self.search_settings(user_id)
         with get_connection(self.db_path) as conn:
             job_row = conn.execute("SELECT * FROM job_postings WHERE id = ? AND user_id = ?", (job_id, user_id)).fetchone()
             if not job_row:
                 raise PermissionError("Job does not belong to this account.")
             job = row_to_job(job_row)
             classification = classify_easy_apply(profile, job)
-            scored = score_job(profile, credentials, job)
+            scored = score_job_with_settings(profile, credentials, job, settings)
             resume_summary, resume_questions = make_resume_summary(profile)
             cover_letter, cover_questions = make_cover_letter(profile, job)
             questions = tuple(classification.unanswered_questions) + tuple(resume_questions) + tuple(cover_questions)
@@ -662,6 +676,8 @@ class Repository:
         created = 0
         updated = 0
         found = 0
+        duplicates = 0
+        stale_total = 0
         errors: list[str] = []
         sources = self.list_job_sources(user_id)
         for source in sources:
@@ -675,19 +691,21 @@ class Repository:
                     seen_external_ids.add(job.external_id)
                     _, was_created = self.upsert_job(user_id, job)
                     created += int(was_created)
-                    updated += int(not was_created)
+                    if was_created:
+                        continue
+                    updated += 1
+                    duplicates += 1
                 stale = self.mark_stale_jobs_for_source(user_id, f"{source['provider']}:{source['board_identifier']}", seen_external_ids)
                 self.update_job_source_status(user_id, source["id"], result.source_status)
+                stale_total += stale
                 updated += stale
             except Exception as exc:
                 message = str(exc)
                 errors.append(f"{source['provider']} {source['board_identifier']}: {message}")
                 self.update_job_source_status(user_id, source["id"], message)
-        return {"found": found, "created": created, "updated": updated, "errors": errors}
+        return {"found": found, "created": created, "updated": updated, "duplicates": duplicates, "stale": stale_total, "errors": errors}
 
     def mark_stale_jobs_for_source(self, user_id: int, source_site: str, current_external_ids: set[str]) -> int:
-        if not current_external_ids:
-            return 0
         with get_connection(self.db_path) as conn:
             rows = conn.execute(
                 """
@@ -718,6 +736,19 @@ class Repository:
 
 def split_csv(value: str) -> tuple[str, ...]:
     return tuple(item.strip() for item in value.split(",") if item.strip())
+
+
+def score_job_with_settings(profile: Profile, credentials: list[Credential], job: JobPosting, settings) -> object:
+    return score_job(
+        profile,
+        credentials,
+        job,
+        preferred_titles=split_csv(settings["job_titles"] if settings else ""),
+        search_keywords=split_csv(settings["search_keywords"] if settings else ""),
+        acceptable_locations=split_csv(settings["acceptable_locations"] if settings else ""),
+        employment_types=split_csv(settings["employment_types"] if settings else ""),
+        remote_ok=bool(settings["remote_ok"]) if settings else False,
+    )
 
 
 def row_to_job(row) -> JobPosting:
