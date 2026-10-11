@@ -365,7 +365,7 @@ class Repository:
     def approve_draft(self, user_id: int, draft_id: int, confirmation_text: str, approved_count: int = 1) -> int:
         with get_connection(self.db_path) as conn:
             owner = conn.execute(
-                "SELECT id, status FROM application_drafts WHERE id = ? AND user_id = ?",
+                "SELECT id, status, unanswered_questions, form_answers FROM application_drafts WHERE id = ? AND user_id = ?",
                 (draft_id, user_id),
             ).fetchone()
             if not owner:
@@ -373,6 +373,8 @@ class Repository:
             transition = can_transition(owner["status"], APPROVED)
             if not transition.ok:
                 raise ValueError(transition.message)
+            if has_unanswered_questions(owner["unanswered_questions"]) and not has_meaningful_form_answers(owner["form_answers"]):
+                raise ValueError("Answer the listed required questions before approving this application.")
             cur = conn.execute(
                 """
                 INSERT INTO approvals (user_id, draft_id, approved_at, approved_count, confirmation_text)
@@ -598,3 +600,29 @@ def row_to_job(row) -> JobPosting:
         required_credentials=split_csv(row["required_credentials"]),
         hourly_pay=row["hourly_pay"],
     )
+
+
+def has_unanswered_questions(value: str) -> bool:
+    if not value:
+        return False
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return bool(value.strip())
+    if isinstance(parsed, list):
+        return any(str(item).strip() for item in parsed)
+    return bool(parsed)
+
+
+def has_meaningful_form_answers(value: str) -> bool:
+    if not value or not value.strip():
+        return False
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return bool(value.strip())
+    if isinstance(parsed, dict):
+        return any(str(key).strip() and str(val).strip() for key, val in parsed.items())
+    if isinstance(parsed, list):
+        return any(str(item).strip() for item in parsed)
+    return bool(str(parsed).strip())

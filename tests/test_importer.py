@@ -30,3 +30,23 @@ def test_parse_job_json_reports_missing_required_fields():
     assert result.jobs == ()
     assert "company" in result.errors[0]
 
+
+def test_parse_job_json_rejects_missing_jobs_list_object():
+    result = parse_job_json('{"title":"Caregiver"}')
+    assert result.jobs == ()
+    assert "jobs list" in result.errors[0]
+
+
+def test_parse_job_json_rejects_wrong_top_level_type():
+    result = parse_job_json('"not a job list"')
+    assert result.jobs == ()
+    assert "list of jobs" in result.errors[0]
+
+
+def test_parse_job_json_rejects_non_http_urls():
+    result = parse_job_json(
+        '[{"title":"Caregiver","company":"Example Care","url":"javascript:alert(1)"}]'
+    )
+    assert result.jobs == ()
+    assert "http:// or https://" in result.errors[0]
+

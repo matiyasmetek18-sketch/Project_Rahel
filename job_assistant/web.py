@@ -11,7 +11,7 @@ from .db import init_db
 from .importer import parse_job_json
 from .models import Credential
 from .repository import Repository
-from .resumes import ALLOWED_EXTENSIONS, stored_resume_path, validate_resume_upload
+from .resumes import ALLOWED_EXTENSIONS, stored_resume_path, validate_resume_file
 from .security import issue_csrf_token, login_required, validate_csrf
 
 
@@ -148,7 +148,7 @@ def create_app(config_object: type[Config] = Config) -> Flask:
                 uploaded.seek(0, os.SEEK_END)
                 size = uploaded.tell()
                 uploaded.seek(0)
-                ok, message = validate_resume_upload(uploaded.filename, size)
+                ok, message = validate_resume_file(uploaded.filename, size, uploaded.stream)
                 if ok:
                     destination = stored_resume_path(Path(app.config["RESUME_DIR"]), g.user["id"], uploaded.filename)
                     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -281,7 +281,7 @@ def create_app(config_object: type[Config] = Config) -> Flask:
             validate_csrf()
             g.repo.update_account_settings(
                 g.user["id"],
-                max(1, min(50, int(request.form.get("default_daily_limit") or 5))),
+                parse_int(request.form.get("default_daily_limit"), default=5, minimum=1, maximum=50),
                 bool(request.form.get("pause_all")),
                 bool(request.form.get("high_contrast")),
                 bool(request.form.get("large_text")),
@@ -300,6 +300,14 @@ def parse_float(value: str | None) -> float | None:
         return float(value)
     except ValueError:
         return None
+
+
+def parse_int(value: str | None, default: int, minimum: int, maximum: int) -> int:
+    try:
+        parsed = int(value or default)
+    except ValueError:
+        parsed = default
+    return max(minimum, min(maximum, parsed))
 
 
 if __name__ == "__main__":

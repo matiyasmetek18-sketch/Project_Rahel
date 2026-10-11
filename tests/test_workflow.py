@@ -58,6 +58,40 @@ def test_review_state_machine_manual_submission(repo: Repository):
     assert repo.get_draft(user_id, draft_id)["status"] == "submitted"
 
 
+def test_approval_requires_required_questions_to_be_answered(repo: Repository):
+    user_id = repo.create_user("rahel", "rahel@example.com", "another-safe-password")
+    repo.update_profile(
+        user_id,
+        full_name="Rahel Example",
+        phone="555-0100",
+        city="Lynnwood",
+        state="WA",
+        zip_code="98036",
+        confirmed_resume_summary="Experienced caregiver.",
+    )
+    job_id, _ = repo.upsert_job(
+        user_id,
+        JobPosting(
+            "manual_import",
+            "job-missing",
+            "Caregiver",
+            "Example Care",
+            "Lynnwood",
+            "WA",
+            "https://example.test/apply",
+            "caregiver",
+            ("name", "email", "phone", "resume", "desired_shift"),
+            (),
+        ),
+    )
+    draft_id = repo.prepare_job(user_id, job_id)
+    with pytest.raises(ValueError, match="required questions"):
+        repo.approve_draft(user_id, draft_id, "Approved 1 application", 1)
+    repo.update_draft_text(user_id, draft_id, "Experienced caregiver.", "Letter", "desired_shift: days")
+    repo.approve_draft(user_id, draft_id, "Approved 1 application", 1)
+    assert repo.get_draft(user_id, draft_id)["status"] == "approved"
+
+
 def test_pause_all_blocks_manual_open(repo: Repository):
     user_id = repo.create_user("rahel", "rahel@example.com", "another-safe-password")
     draft_id = make_prepared_draft(repo, user_id)

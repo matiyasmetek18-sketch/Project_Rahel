@@ -85,3 +85,16 @@ def test_logout_requires_csrf(client, repo: Repository):
     sign_in(client, repo)
     assert client.post("/signout").status_code == 400
 
+
+def test_invalid_settings_limit_falls_back_without_server_error(client, repo: Repository):
+    sign_in(client, repo)
+    html = client.get("/settings").get_data(as_text=True)
+    token = csrf_from(html)
+    response = client.post(
+        "/settings",
+        data={"csrf_token": token, "default_daily_limit": "not-a-number", "high_contrast": "1", "large_text": "1"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "Settings saved" in response.get_data(as_text=True)
+

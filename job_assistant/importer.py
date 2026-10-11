@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlparse
 
 from .models import JobPosting
 
@@ -19,7 +20,14 @@ def parse_job_json(payload: str, default_source: str = "manual_import") -> Impor
     except json.JSONDecodeError as exc:
         return ImportResult((), (f"Invalid JSON: {exc.msg}.",))
 
-    items = raw if isinstance(raw, list) else raw.get("jobs", []) if isinstance(raw, dict) else []
+    if isinstance(raw, list):
+        items = raw
+    elif isinstance(raw, dict) and isinstance(raw.get("jobs"), list):
+        items = raw["jobs"]
+    elif isinstance(raw, dict):
+        return ImportResult((), ("JSON object must include a jobs list.",))
+    else:
+        return ImportResult((), ("JSON must be a list of jobs or an object with a jobs list.",))
     if not isinstance(items, list):
         return ImportResult((), ("JSON must be a list of jobs or an object with a jobs list.",))
 
@@ -33,8 +41,12 @@ def parse_job_json(payload: str, default_source: str = "manual_import") -> Impor
         if missing:
             errors.append(f"Job {index} is missing: {', '.join(missing)}.")
             continue
+        url = clean(item.get("url"))
+        if not is_http_url(url):
+            errors.append(f"Job {index} url must start with http:// or https://.")
+            continue
         source_site = clean(item.get("source_site")) or default_source
-        external_id = clean(item.get("external_id")) or f"{source_site}:{clean(item.get('url'))}"
+        external_id = clean(item.get("external_id")) or f"{source_site}:{url}"
         jobs.append(
             JobPosting(
                 source_site=source_site,
@@ -43,7 +55,7 @@ def parse_job_json(payload: str, default_source: str = "manual_import") -> Impor
                 company=clean(item.get("company")),
                 city=clean(item.get("city")),
                 state=clean(item.get("state")),
-                url=clean(item.get("url")),
+                url=url,
                 description=clean(item.get("description")),
                 required_fields=tuple_list(item.get("required_fields")),
                 required_credentials=tuple_list(item.get("required_credentials")),
@@ -74,3 +86,8 @@ def number_or_none(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def is_http_url(value: str) -> bool:
+    parsed = urlparse(value)
+    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
